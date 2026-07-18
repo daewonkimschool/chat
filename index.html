@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안전 레이아웃 실시간 채팅방</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        /* 이름 입력 화면 */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        #login-box { background: white; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 300px; }
+        #login-box h2 { margin-bottom: 15px; font-size: 1.2rem; }
+        #nickname-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; font-size: 1rem; text-align: center;}
+        #start-btn { width: 100%; background: #007fff; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem; }
+
+        /* 메인 레이아웃 (접속자창 + 채팅창) */
+        #main-container { display: none; width: 100%; max-width: 800px; height: 90vh; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: 16px; overflow: hidden; }
+        
+        /* 👥 왼쪽 접속자 목록 사이드바 */
+        #sidebar { width: 220px; background: #2f3e46; color: #f4f7f6; display: flex; flex-direction: column; border-right: 1px solid #ddd; flex-shrink: 0; /* 사이드바가 찌그러지지 않게 고정 */ }
+        #sidebar-header { padding: 18px; font-weight: bold; font-size: 1rem; border-bottom: 1px solid #354f52; background: #202c31; }
+        #user-count { font-size: 0.85rem; color: #84a98c; margin-top: 4px; display: block; }
+        #user-list { flex: 1; padding: 15px; overflow-y: auto; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .user-item { font-size: 0.9rem; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; /* 유저 이름이 너무 길어질 때 방어 */ }
+        .user-item::before { content: ""; display: inline-block; width: 8px; height: 8px; background-color: #2ec4b6; border-radius: 50%; flex-shrink: 0; }
+        .user-item.me-item { font-weight: bold; color: #cad2c5; }
+        .user-item.me-item::before { background-color: #ff9f1c; }
+
+        /* 💬 오른쪽 채팅 화면 */
+        #chat-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 0; /* 중요: Flex 자식 요소가 부모 너비를 터치는 것 방지 */ }
+        #header { background: #007fff; color: white; padding: 15px 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; }
+        #logout-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        #logout-btn:hover { background: rgba(255,255,255,0.3); }
+        
+        #messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background: #fafafa; }
+        
+        /* 🔥 메시지 스타일 보안 및 레이아웃 수정 */
+        .msg-box { 
+            max-width: 75%; 
+            padding: 10px 14px; 
+            border-radius: 14px; 
+            font-size: 0.95rem; 
+            line-height: 1.4; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column;
+            
+            /* ⚠️ 가로 터짐 철벽 방어 코드 */
+            word-break: break-all;          /* 단어가 길어도 무조건 강제 줄바꿈 */
+            overflow-wrap: break-word;      /* 넘치는 텍스트 감싸기 */
+            white-space: pre-wrap;          /* 엔터(줄바꿈)나 공백 유지 */
+        }
+        .msg-box.other { background: #e9ecef; align-self: flex-start; border-top-left-radius: 2px; margin-top: 15px; }
+        .msg-box.me { background: #007fff; color: white; align-self: flex-end; border-top-right-radius: 2px; }
+        .msg-box.system { background: #fff3cd; color: #856404; align-self: center; text-align: center; font-size: 0.8rem; border-radius: 30px; max-width: 90%; padding: 5px 15px; word-break: keep-all; }
+        
+        .sender-name { font-size: 0.75rem; color: #6c757d; position: absolute; top: -18px; left: 5px; white-space: nowrap; }
+        .msg-time { font-size: 0.7rem; color: #adb5bd; align-self: flex-end; margin-top: 4px; }
+        .msg-box.me .msg-time { color: rgba(255, 255, 255, 0.7); }
+
+        /* ⚠️ 메시지 박스 안의 사진 스타일 (완벽 제어) */
+        .msg-image {
+            max-width: 100%;       /* 메시지 박스를 절대 벗어나지 않음 */
+            max-height: 250px;     /* 사진이 너무 아래로 길어지는 것 제한 */
+            border-radius: 8px;
+            margin-top: 5px;
+            object-fit: contain;   /* 비율 깨짐 방지 */
+            cursor: pointer;
+            display: block;
+        }
+
+        #form { display: flex; padding: 12px; background: #fff; border-top: 1px solid #eaeaea; }
+        #input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 0.95rem; }
+        #send { background: #007fff; color: white; border: none; padding: 0 18px; margin-left: 8px; border-radius: 24px; cursor: pointer; font-weight: bold; }
+
+        /* 반응형 디자인 */
+        @media (max-width: 600px) {
+            #main-container { flex-direction: column; height: 95vh; }
+            #sidebar { width: 100%; height: 100px; border-right: none; border-bottom: 1px solid #354f52; }
+            #user-list { flex-direction: row; flex-wrap: wrap; gap: 10px; overflow-x: auto; overflow-y: hidden; height: 40px; padding: 5px 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div id="login-box">
+        <h2>사용할 이름을 입력하세요</h2>
+        <input type="text" id="nickname-input" placeholder="닉네임 (최대 8자)" maxlength="8" autocomplete="off">
+        <button id="start-btn">채팅 시작하기</button>
+    </div>
+</div>
+
+<div id="main-container">
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <span>참여자 목록</span>
+            <span id="user-count">현재 0명 접속 중</span>
+        </div>
+        <ul id="user-list"></ul>
+    </div>
+
+    <div id="chat-wrapper">
+        <div id="header">
+            <span>실시간 오픈 대화방</span>
+            <button id="logout-btn" onclick="logout()">로그아웃</button>
+        </div>
+        <div id="messages"></div>
+        <form id="form">
+            <input id="input" autocomplete="off" placeholder="메시지 또는 이미지 주소를 입력하세요..." required />
+            <button id="send">전송</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ⚠️ 본인의 Render 서버 주소로 변경해 주세요!
+    const SERVER_URL = "https://chats-4ci4.onrender.com"; 
+    
+    const socket = io(SERVER_URL, { autoConnect: false });
+
+    let myName = "";
+
+    const loginOverlay = document.getElementById('login-overlay');
+    const nicknameInput = document.getElementById('nickname-input');
+    const startBtn = document.getElementById('start-btn');
+    const mainContainer = document.getElementById('main-container');
+    const userListElement = document.getElementById('user-list');
+    const userCountElement = document.getElementById('user-count');
+    
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+
+    window.onload = function() {
+        const savedName = localStorage.getItem('chat_nickname');
+        if (savedName) {
+            myName = savedName;
+            connectAndJoin();
+        }
+        requestNotificationPermission();
+    }
+
+    function requestNotificationPermission() {
+        if ("Notification" in window) {
+            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        }
+    }
+
+    function joinChat() {
+        const enteredName = nicknameInput.value.trim();
+        if(!enteredName) {
+            alert("이름을 입력해주세요!");
+            return;
+        }
+        myName = enteredName;
+        localStorage.setItem('chat_nickname', myName);
+        connectAndJoin();
+    }
+
+    function connectAndJoin() {
+        socket.connect();
+        socket.emit('join', myName);
+
+        loginOverlay.style.display = 'none';
+        mainContainer.style.display = 'flex';
+        input.focus();
+    }
+
+    function logout() {
+        localStorage.removeItem('chat_nickname');
+        location.reload();
+    }
+
+    startBtn.addEventListener('click', joinChat);
+    nicknameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') joinChat(); });
+
+
+    /* [실시간 소켓 이벤트] */
+
+    socket.on('bot message', (msg) => {
+        const item = document.createElement('div');
+        item.classList.add('msg-box', 'system');
+        item.textContent = msg;
+        messages.appendChild(item);
+        scrollToBottom();
+    });
+
+    socket.on('chat history', (history) => {
+        history.forEach((data) => {
+            appendMessage(data);
+        });
+    });
+
+    socket.on('chat message', (data) => {
+        appendMessage(data);
+        
+        const isMe = data.name === myName;
+        if (!isMe && document.hidden) {
+            // 알림창 텍스트 정제 (이미지 주소일 때는 '[사진]'으로 알림)
+            const alertText = isImageUrl(data.text) ? "[사진을 보냈습니다]" : data.text;
+            sendPushNotification(data.name, alertText);
+        }
+    });
+
+    socket.on('user list', (users) => {
+        userListElement.innerHTML = "";
+        userCountElement.textContent = `현재 ${users.length}명 접속 중`;
+
+        users.forEach((user) => {
+            const li = document.createElement('li');
+            li.classList.add('user-item');
+            
+            if(user === myName) {
+                li.classList.add('me-item');
+                li.textContent = `${user} (나)`;
+            } else {
+                li.textContent = user;
+            }
+            
+            userListElement.appendChild(li);
+        });
+    });
+
+    function sendPushNotification(sender, text) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            const notification = new Notification(`💬 ${sender}님의 새 메시지`, {
+                body: text,
+                icon: "https://cdn-icons-png.flaticon.com/512/1041/1041916.png"
+            });
+
+            notification.onclick = function() {
+                window.focus();
+                notification.close();
+            };
+        }
+    }
+
+    // ⚠️ 이미지 URL 판별 헬퍼 함수
+    function isImageUrl(url) {
+        return (url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) != null) || url.startsWith('data:image/');
+    }
+
+    // 메시지 출력 처리 함수
+    function appendMessage(data) {
+        const item = document.createElement('div');
+        const isMe = data.name === myName;
+        
+        item.classList.add('msg-box', isMe ? 'me' : 'other');
+        
+        // 1. 메시지 내부 구조 뼈대 만들기
+        let innerContent = "";
+        if(!isMe) {
+            innerContent += `<span class="sender-name">${data.name}</span>`;
+        }
+
+        // 2. 입력된 텍스트가 이미지 주소인지 일반 텍스트인지 판별하여 주입
+        if (isImageUrl(data.text)) {
+            innerContent += `<img src="${data.text}" class="msg-image" alt="전송된 이미지" onclick="window.open(this.src)">`;
+        } else {
+            // HTML 삽입 시 발생할 수 있는 보안 취약점(XSS) 방지를 위해 텍스트 처리
+            const textSpan = document.createElement('span');
+            textSpan.textContent = data.text;
+            innerContent += `<div>${textSpan.innerHTML}</div>`;
+        }
+
+        innerContent += `<span class="msg-time">${data.time || ''}</span>`;
+        item.innerHTML = innerContent;
+        
+        messages.appendChild(item);
+        
+        // ⚠️ 이미지가 포함되어 있을 때, 이미지가 로드된 직후 스크롤을 끝까지 내려줍니다.
+        const img = item.querySelector('img');
+        if (img) {
+            img.onload = scrollToBottom;
+        } else {
+            scrollToBottom();
+        }
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const msgText = input.value.trim();
+        
+        if (!msgText) return;
+
+        if (!socket.connected) {
+            alert("서버와 연결이 지연되고 있습니다. 잠시만 기다려 주세요!");
+            return;
+        }
+
+        socket.emit('chat message', msgText);
+        input.value = '';
+    });
+
+    function scrollToBottom() {
+        messages.scrollTop = messages.scrollHeight;
+    }
+</script>
+</body>
+</html>
