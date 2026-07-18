@@ -20,24 +20,24 @@
         #main-container { display: none; width: 100%; max-width: 800px; height: 90vh; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: 16px; overflow: hidden; }
         
         /* 👥 왼쪽 접속자 목록 사이드바 */
-        #sidebar { width: 220px; background: #2f3e46; color: #f4f7f6; display: flex; flex-direction: column; border-right: 1px solid #ddd; flex-shrink: 0; /* 사이드바가 찌그러지지 않게 고정 */ }
+        #sidebar { width: 220px; background: #2f3e46; color: #f4f7f6; display: flex; flex-direction: column; border-right: 1px solid #ddd; flex-shrink: 0; }
         #sidebar-header { padding: 18px; font-weight: bold; font-size: 1rem; border-bottom: 1px solid #354f52; background: #202c31; }
         #user-count { font-size: 0.85rem; color: #84a98c; margin-top: 4px; display: block; }
         #user-list { flex: 1; padding: 15px; overflow-y: auto; list-style: none; display: flex; flex-direction: column; gap: 8px; }
-        .user-item { font-size: 0.9rem; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; /* 유저 이름이 너무 길어질 때 방어 */ }
+        .user-item { font-size: 0.9rem; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .user-item::before { content: ""; display: inline-block; width: 8px; height: 8px; background-color: #2ec4b6; border-radius: 50%; flex-shrink: 0; }
         .user-item.me-item { font-weight: bold; color: #cad2c5; }
         .user-item.me-item::before { background-color: #ff9f1c; }
 
         /* 💬 오른쪽 채팅 화면 */
-        #chat-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 0; /* 중요: Flex 자식 요소가 부모 너비를 터치는 것 방지 */ }
+        #chat-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 0; }
         #header { background: #007fff; color: white; padding: 15px 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; }
         #logout-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
         #logout-btn:hover { background: rgba(255,255,255,0.3); }
         
         #messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background: #fafafa; }
         
-        /* 🔥 메시지 스타일 보안 및 레이아웃 수정 */
+        /* 메시지 스타일 */
         .msg-box { 
             max-width: 75%; 
             padding: 10px 14px; 
@@ -47,11 +47,9 @@
             position: relative; 
             display: flex; 
             flex-direction: column;
-            
-            /* ⚠️ 가로 터짐 철벽 방어 코드 */
-            word-break: break-all;          /* 단어가 길어도 무조건 강제 줄바꿈 */
-            overflow-wrap: break-word;      /* 넘치는 텍스트 감싸기 */
-            white-space: pre-wrap;          /* 엔터(줄바꿈)나 공백 유지 */
+            word-break: break-all;          
+            overflow-wrap: break-word;      
+            white-space: pre-wrap;          
         }
         .msg-box.other { background: #e9ecef; align-self: flex-start; border-top-left-radius: 2px; margin-top: 15px; }
         .msg-box.me { background: #007fff; color: white; align-self: flex-end; border-top-right-radius: 2px; }
@@ -61,13 +59,12 @@
         .msg-time { font-size: 0.7rem; color: #adb5bd; align-self: flex-end; margin-top: 4px; }
         .msg-box.me .msg-time { color: rgba(255, 255, 255, 0.7); }
 
-        /* ⚠️ 메시지 박스 안의 사진 스타일 (완벽 제어) */
         .msg-image {
-            max-width: 100%;       /* 메시지 박스를 절대 벗어나지 않음 */
-            max-height: 250px;     /* 사진이 너무 아래로 길어지는 것 제한 */
+            max-width: 100%;       
+            max-height: 250px;     
             border-radius: 8px;
             margin-top: 5px;
-            object-fit: contain;   /* 비율 깨짐 방지 */
+            object-fit: contain;   
             cursor: pointer;
             display: block;
         }
@@ -86,6 +83,7 @@
 </head>
 <body>
 
+<!-- 이름 입력 팝업 화면 -->
 <div id="login-overlay">
     <div id="login-box">
         <h2>사용할 이름을 입력하세요</h2>
@@ -94,6 +92,7 @@
     </div>
 </div>
 
+<!-- 메인 컨테이너 -->
 <div id="main-container">
     <div id="sidebar">
         <div id="sidebar-header">
@@ -109,20 +108,18 @@
             <button id="logout-btn" onclick="logout()">로그아웃</button>
         </div>
         <div id="messages"></div>
-        <!-- 폼 태그 바로 위에 삽입하세요 -->
-    <div id="game-guide" style="padding: 6px 15px; background: #f8f9fa; border-top: 1px solid #eee; font-size: 0.8rem; color: #666; display: flex; gap: 10px;">
-        <span>💡 <b>게임 명령어:</b></span>
-        <span><code>/주사위</code> (랜덤 내기)</span>
-        <span><code>/숫자 [1-50]</code> (업다운 게임)</span>
-    </div>
+        
+        <!-- 🎮 게임 명령어 가이드 유행 디자인 반영 -->
+        <div id="game-guide" style="padding: 8px 15px; background: #f8f9fa; border-top: 1px solid #eee; font-size: 0.8rem; color: #666; display: flex; gap: 10px; align-items: center;">
+            <span>💡 <b>게임 명령어:</b></span>
+            <span><code>/주사위</code> (랜덤 내기)</span>
+            <span><code>/숫자 [1-50]</code> (업다운 게임)</span>
+        </div>
 
-    <form id="form">
-        <input id="input" autocomplete="off" placeholder="메시지를 입력하세요..." required />
-        <button id="send">전송</button>
-    </form>
+        <!-- ⚠️ 중복되었던 폼 태그 통합 및 힌트 문구 수정 -->
         <form id="form">
             <input id="input" autocomplete="off" placeholder="메시지 또는 이미지 주소를 입력하세요..." required />
-            <button id="send">전송</button>
+            <button id="send" type="submit">전송</button>
         </form>
     </div>
 </div>
@@ -213,7 +210,6 @@
         
         const isMe = data.name === myName;
         if (!isMe && document.hidden) {
-            // 알림창 텍스트 정제 (이미지 주소일 때는 '[사진]'으로 알림)
             const alertText = isImageUrl(data.text) ? "[사진을 보냈습니다]" : data.text;
             sendPushNotification(data.name, alertText);
         }
@@ -252,29 +248,24 @@
         }
     }
 
-    // ⚠️ 이미지 URL 판별 헬퍼 함수
     function isImageUrl(url) {
         return (url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) != null) || url.startsWith('data:image/');
     }
 
-    // 메시지 출력 처리 함수
     function appendMessage(data) {
         const item = document.createElement('div');
         const isMe = data.name === myName;
         
         item.classList.add('msg-box', isMe ? 'me' : 'other');
         
-        // 1. 메시지 내부 구조 뼈대 만들기
         let innerContent = "";
         if(!isMe) {
             innerContent += `<span class="sender-name">${data.name}</span>`;
         }
 
-        // 2. 입력된 텍스트가 이미지 주소인지 일반 텍스트인지 판별하여 주입
         if (isImageUrl(data.text)) {
             innerContent += `<img src="${data.text}" class="msg-image" alt="전송된 이미지" onclick="window.open(this.src)">`;
         } else {
-            // HTML 삽입 시 발생할 수 있는 보안 취약점(XSS) 방지를 위해 텍스트 처리
             const textSpan = document.createElement('span');
             textSpan.textContent = data.text;
             innerContent += `<div>${textSpan.innerHTML}</div>`;
@@ -285,7 +276,6 @@
         
         messages.appendChild(item);
         
-        // ⚠️ 이미지가 포함되어 있을 때, 이미지가 로드된 직후 스크롤을 끝까지 내려줍니다.
         const img = item.querySelector('img');
         if (img) {
             img.onload = scrollToBottom;
