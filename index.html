@@ -109,6 +109,17 @@
             <button id="logout-btn" onclick="logout()">로그아웃</button>
         </div>
         <div id="messages"></div>
+        <!-- 폼 태그 바로 위에 삽입하세요 -->
+    <div id="game-guide" style="padding: 6px 15px; background: #f8f9fa; border-top: 1px solid #eee; font-size: 0.8rem; color: #666; display: flex; gap: 10px;">
+        <span>💡 <b>게임 명령어:</b></span>
+        <span><code>/주사위</code> (랜덤 내기)</span>
+        <span><code>/숫자 [1-50]</code> (업다운 게임)</span>
+    </div>
+
+    <form id="form">
+        <input id="input" autocomplete="off" placeholder="메시지를 입력하세요..." required />
+        <button id="send">전송</button>
+    </form>
         <form id="form">
             <input id="input" autocomplete="off" placeholder="메시지 또는 이미지 주소를 입력하세요..." required />
             <button id="send">전송</button>
