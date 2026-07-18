@@ -114,21 +114,48 @@ io.on('connection', (socket) => {
     io.emit('user list', getActiveUsers());
   });
 
-  socket.on('chat message', (msg) => {
-    if(socket.userName) {
-      const messageData = { 
-        name: socket.userName, 
-        text: msg,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
+  // 🎮 게임용 랜덤 정답 숫자 (1~50) - 서버가 기억합니다.
+  let targetNumber = Math.floor(Math.random() * 50) + 1;
 
-      messageHistory.push(messageData);
-      if (messageHistory.length > MAX_HISTORY) {
-        messageHistory.shift();
+  socket.on('chat message', (msg) => {
+    const trimmedMsg = msg.trim();
+
+    // 🎲 1. 주사위 기능 (/주사위)
+    if (trimmedMsg === '/주사위') {
+      const dice = Math.floor(Math.random() * 6) + 1;
+      io.emit('chat message', { 
+        name: '🎲 게임봇', 
+        text: `[내기] ${userName}님이 주사위를 굴려 [ ${dice} ]이(가) 나왔습니다!` 
+      });
+      return;
+    }
+
+    // 🔢 2. 숫자 맞추기 기능 (/숫자 정답)
+    if (trimmedMsg.startsWith('/숫자')) {
+      const args = trimmedMsg.split(' ');
+      const guess = parseInt(args[1]);
+
+      if (isNaN(guess)) {
+        socket.emit('chat message', { name: '🤖 게임봇', text: '사용법: /숫자 [1부터 50 사이의 숫자]를 입력하세요. (예: /숫자 25)' });
+        return;
       }
 
-      io.emit('chat message', messageData);
+      if (guess === targetNumber) {
+        io.emit('chat message', { 
+          name: '🎉 게임봇', 
+          text: `정답!! ${userName}님이 정답 [ ${targetNumber} ]을(를) 맞추셨습니다! 다음 게임 숫자가 새로 생성되었습니다.` 
+        });
+        targetNumber = Math.floor(Math.random() * 50) + 1; // 새 게임 시작
+      } else if (guess < targetNumber) {
+        io.emit('chat message', { name: '🤖 게임봇', text: `${userName}님의 입력: ${guess} ➡️ [ UP ] 더 높은 숫자입니다!` });
+      } else {
+        io.emit('chat message', { name: '🤖 게임봇', text: `${userName}님의 입력: ${guess} ➡️ [ DOWN ] 더 낮은 숫자입니다!` });
+      }
+      return;
     }
+
+    // 일반 채팅 메시지는 그대로 전송
+    io.emit('chat message', { name: userName, text: msg });
   });
 
   socket.on('disconnect', () => {
